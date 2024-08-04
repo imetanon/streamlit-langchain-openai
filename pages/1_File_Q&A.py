@@ -14,7 +14,6 @@ from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.prompts import ChatPromptTemplate
 
-
 def get_vectorstore_from_file(path, file_name):
     loader = PyMuPDFLoader(path)
     document = loader.load()
@@ -24,20 +23,19 @@ def get_vectorstore_from_file(path, file_name):
     document_chunks = text_splitter.split_documents(document)
 
     # create a vectorstore from the chunks
-    vector_store = Chroma.from_documents(documents=document_chunks, embedding=OpenAIEmbeddings(model="text-embedding-3-small",api_key=openai_api_key))
+    vector_store = Chroma.from_documents(documents=document_chunks, embedding=OpenAIEmbeddings(model="text-embedding-ada-002", api_key=openai_api_key))
 
     return vector_store
 
 def get_conversational_rag_chain(retriever):
-
-    llm = ChatOpenAI(model="gpt-4o", api_key=openai_api_key)
+    llm = ChatOpenAI(model="gpt-4", api_key=openai_api_key)
 
     system_prompt = (
         "You are an assistant for question-answering tasks. "
         "Use the following pieces of retrieved context to answer "
         "the question. If you don't know the answer, say that you "
         "don't know. Use three sentences maximum and keep the "
-        "answer concise. Please correct the word or pharse if it incorrect."
+        "answer concise. Please correct the word or phrase if it is incorrect."
         "\n\n"
         "{context}"
     )
@@ -76,16 +74,23 @@ uploaded_file = st.file_uploader("Upload an article", type=("txt", "pdf"))
 if not openai_api_key:
     st.info("Please add your OpenAI API key to continue.")
 else:
-    # session state
-    if "vector_store" not in st.session_state:
-        if uploaded_file:
-            temp_dir = tempfile.mkdtemp()
-            path = os.path.join(temp_dir, uploaded_file.name)
-            with open(path, "wb") as f:
-                f.write(uploaded_file.getvalue())
+    if uploaded_file:
+        temp_dir = tempfile.mkdtemp()
+        path = os.path.join(temp_dir, uploaded_file.name)
+        with open(path, "wb") as f:
+            f.write(uploaded_file.getvalue())
+        
+        # Check if there is a previously uploaded file and clear the session state
+        if "uploaded_file_path" in st.session_state:
+            if st.session_state.uploaded_file_path != path:
+                st.session_state.vector_store = None
+
+        st.session_state.uploaded_file_path = path
+        
+        if "vector_store" not in st.session_state or st.session_state.vector_store is None:
             st.session_state.vector_store = get_vectorstore_from_file(path, uploaded_file.name)
-        else:
-            st.info("Please upload file.")
+    else:
+        st.info("Please upload a file.")
 
     question = st.text_input(
         "Ask something about the file content",
