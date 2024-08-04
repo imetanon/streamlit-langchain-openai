@@ -74,20 +74,25 @@ uploaded_file = st.file_uploader("Upload an article", type=("txt", "pdf"))
 if not openai_api_key:
     st.info("Please add your OpenAI API key to continue.")
 else:
+    # Initialize session state
+    if "vector_store" not in st.session_state:
+        st.session_state.vector_store = None
+    if "uploaded_file_path" not in st.session_state:
+        st.session_state.uploaded_file_path = None
+
     if uploaded_file:
         temp_dir = tempfile.mkdtemp()
         path = os.path.join(temp_dir, uploaded_file.name)
         with open(path, "wb") as f:
             f.write(uploaded_file.getvalue())
         
-        # Check if there is a previously uploaded file and clear the session state
-        if "uploaded_file_path" in st.session_state:
-            if st.session_state.uploaded_file_path != path:
-                st.session_state.vector_store = None
+        # Check if there is a previously uploaded file and clear the session state if a new file is uploaded
+        if st.session_state.uploaded_file_path != path:
+            st.session_state.vector_store = None
 
         st.session_state.uploaded_file_path = path
         
-        if "vector_store" not in st.session_state or st.session_state.vector_store is None:
+        if st.session_state.vector_store is None:
             st.session_state.vector_store = get_vectorstore_from_file(path, uploaded_file.name)
     else:
         st.info("Please upload a file.")
@@ -98,7 +103,7 @@ else:
         disabled=not uploaded_file,
     )
 
-    if question is not None and question != "":
+    if question:
         response = get_response(question)
 
         st.write("### Answer")
